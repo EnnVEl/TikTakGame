@@ -1170,4 +1170,781 @@
         init();
     </script>
 </body>
+    </html>{
+            border-color: #3b82f6;
+        }
+
+        .search-box::placeholder {
+            color: #64748b;
+        }
+
+        .stats {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 1rem;
+        }
+
+        .city-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .city-card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 0.9rem 1rem;
+            border: 1px solid #334155;
+            transition: border-color 0.15s, background 0.15s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .city-card:hover {
+            border-color: #3b82f6;
+            background: #1e2a3f;
+        }
+
+        .city-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .city-name {
+            font-weight: 500;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .city-country {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .city-time {
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #60a5fa;
+            letter-spacing: 0.5px;
+            text-align: right;
+            flex-shrink: 0;
+            margin-left: 0.75rem;
+        }
+
+        .city-date {
+            font-size: 0.65rem;
+            color: #64748b;
+            text-align: right;
+            margin-top: 2px;
+        }
+
+        .no-results {
+            text-align: center;
+            color: #64748b;
+            padding: 3rem 1rem;
+            font-size: 1rem;
+        }
+
+        @media (max-width: 500px) {
+            body { padding: 1rem; }
+            h1 { font-size: 1.4rem; }
+            .city-grid { grid-template-columns: 1fr; }
+            .city-time { font-size: 1rem; }
+            .my-city-time { font-size: 2.8rem; }
+            .my-city-card { padding: 2rem 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Модальное окно выбора города -->
+    <div class="modal-overlay hidden" id="modalOverlay">
+        <div class="modal">
+            <h2 id="modalTitle">В каком городе вы живёте?</h2>
+            <p id="modalSubtitle">Выберите город — его время будет на первой вкладке.</p>
+            <input type="text" id="modalInput" placeholder="Начните вводить название..." autocomplete="off">
+            <div class="modal-suggestions" id="modalSuggestions"></div>
+            <div class="modal-error" id="modalError"></div>
+            <button class="btn" id="modalConfirm" disabled>Подтвердить</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>🌍 Мировое время</h1>
+            <div class="subtitle">Тёмная тема · автоматический переход на летнее время</div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="my">Мой город</button>
+            <button class="tab" data-tab="all">Все города</button>
+        </div>
+
+        <!-- Вкладка 1: Мой город -->
+        <div class="tab-content active" id="tab-my">
+            <div class="my-city-card">
+                <div class="my-city-name" id="myCityName">—</div>
+                <div class="my-city-country" id="myCityCountry">—</div>
+                <div class="my-city-time">
+                    <span id="myCityHHMM">--:--</span><span class="my-city-seconds" id="myCitySS">:--</span>
+                </div>
+                <div class="my-city-date" id="myCityDate">—</div>
+                <div class="my-city-tz" id="myCityTz">—</div>
+
+                <!-- Кнопка "+" -->
+                <div class="add-city-wrap">
+                    <button class="add-city-btn" id="addCityBtn" title="Добавить город">+</button>
+                </div>
+
+                <!-- Дополнительные города -->
+                <div class="extra-cities" id="extraCities"></div>
+
+                <button class="change-city-btn" id="changeCityBtn">Сменить мой город</button>
+            </div>
+        </div>
+
+        <!-- Вкладка 2: Все города -->
+        <div class="tab-content" id="tab-all">
+            <input type="text" id="search" class="search-box" placeholder="Поиск города или страны..." autocomplete="off">
+            <div class="stats" id="stats"></div>
+            <div class="city-grid" id="grid"></div>
+            <div class="no-results" id="noResults" style="display:none;">Город не найден</div>
+        </div>
+    </div>
+
+    <script>
+        // ===== Список городов =====
+        const CITIES = [
+            ["Орёл", "Россия", "Europe/Moscow"],
+            ["Москва", "Россия", "Europe/Moscow"],
+            ["Санкт-Петербург", "Россия", "Europe/Moscow"],
+            ["Новосибирск", "Россия", "Asia/Novosibirsk"],
+            ["Екатеринбург", "Россия", "Asia/Yekaterinburg"],
+            ["Казань", "Россия", "Europe/Moscow"],
+            ["Владивосток", "Россия", "Asia/Vladivostok"],
+            ["Красноярск", "Россия", "Asia/Krasnoyarsk"],
+            ["Омск", "Россия", "Asia/Omsk"],
+            ["Самара", "Россия", "Europe/Samara"],
+            ["Уфа", "Россия", "Asia/Yekaterinburg"],
+            ["Ростов-на-Дону", "Россия", "Europe/Moscow"],
+            ["Краснодар", "Россия", "Europe/Moscow"],
+            ["Сочи", "Россия", "Europe/Moscow"],
+            ["Калининград", "Россия", "Europe/Kaliningrad"],
+            ["Мурманск", "Россия", "Europe/Moscow"],
+            ["Якутск", "Россия", "Asia/Yakutsk"],
+            ["Магадан", "Россия", "Asia/Magadan"],
+            ["Петропавловск-Камчатский", "Россия", "Asia/Kamchatka"],
+            ["Лондон", "Великобритания", "Europe/London"],
+            ["Париж", "Франция", "Europe/Paris"],
+            ["Берлин", "Германия", "Europe/Berlin"],
+            ["Мадрид", "Испания", "Europe/Madrid"],
+            ["Рим", "Италия", "Europe/Rome"],
+            ["Лиссабон", "Португалия", "Europe/Lisbon"],
+            ["Амстердам", "Нидерланды", "Europe/Amsterdam"],
+            ["Брюссель", "Бельгия", "Europe/Brussels"],
+            ["Вена", "Австрия", "Europe/Vienna"],
+            ["Цюрих", "Швейцария", "Europe/Zurich"],
+            ["Стокгольм", "Швеция", "Europe/Stockholm"],
+            ["Осло", "Норвегия", "Europe/Oslo"],
+            ["Копенгаген", "Дания", "Europe/Copenhagen"],
+            ["Хельсинки", "Финляндия", "Europe/Helsinki"],
+            ["Варшава", "Польша", "Europe/Warsaw"],
+            ["Прага", "Чехия", "Europe/Prague"],
+            ["Будапешт", "Венгрия", "Europe/Budapest"],
+            ["Афины", "Греция", "Europe/Athens"],
+            ["Стамбул", "Турция", "Europe/Istanbul"],
+            ["Киев", "Украина", "Europe/Kyiv"],
+            ["Минск", "Беларусь", "Europe/Minsk"],
+            ["Тбилиси", "Грузия", "Asia/Tbilisi"],
+            ["Ереван", "Армения", "Asia/Yerevan"],
+            ["Баку", "Азербайджан", "Asia/Baku"],
+            ["Ташкент", "Узбекистан", "Asia/Tashkent"],
+            ["Алматы", "Казахстан", "Asia/Almaty"],
+            ["Астана", "Казахстан", "Asia/Almaty"],
+            ["Бишкек", "Киргизия", "Asia/Bishkek"],
+            ["Душанбе", "Таджикистан", "Asia/Dushanbe"],
+            ["Нью-Йорк", "США", "America/New_York"],
+            ["Лос-Анджелес", "США", "America/Los_Angeles"],
+            ["Чикаго", "США", "America/Chicago"],
+            ["Хьюстон", "США", "America/Chicago"],
+            ["Финикс", "США", "America/Phoenix"],
+            ["Филадельфия", "США", "America/New_York"],
+            ["Сан-Антонио", "США", "America/Chicago"],
+            ["Сан-Диего", "США", "America/Los_Angeles"],
+            ["Даллас", "США", "America/Chicago"],
+            ["Сан-Хосе", "США", "America/Los_Angeles"],
+            ["Остин", "США", "America/Chicago"],
+            ["Джэксонвилл", "США", "America/New_York"],
+            ["Сан-Франциско", "США", "America/Los_Angeles"],
+            ["Сиэтл", "США", "America/Los_Angeles"],
+            ["Денвер", "США", "America/Denver"],
+            ["Бостон", "США", "America/New_York"],
+            ["Майами", "США", "America/New_York"],
+            ["Атланта", "США", "America/New_York"],
+            ["Торонто", "Канада", "America/Toronto"],
+            ["Монреаль", "Канада", "America/Toronto"],
+            ["Ванкувер", "Канада", "America/Vancouver"],
+            ["Калгари", "Канада", "America/Edmonton"],
+            ["Оттава", "Канада", "America/Toronto"],
+            ["Мехико", "Мексика", "America/Mexico_City"],
+            ["Гвадалахара", "Мексика", "America/Mexico_City"],
+            ["Монтеррей", "Мексика", "America/Monterrey"],
+            ["Гавана", "Куба", "America/Havana"],
+            ["Санто-Доминго", "Доминикана", "America/Santo_Domingo"],
+            ["Сан-Хуан", "Пуэрто-Рико", "America/Puerto_Rico"],
+            ["Богота", "Колумбия", "America/Bogota"],
+            ["Лима", "Перу", "America/Lima"],
+            ["Сантьяго", "Чили", "America/Santiago"],
+            ["Буэнос-Айрес", "Аргентина", "America/Argentina/Buenos_Aires"],
+            ["Сан-Паулу", "Бразилия", "America/Sao_Paulo"],
+            ["Рио-де-Жанейро", "Бразилия", "America/Sao_Paulo"],
+            ["Бразилиа", "Бразилия", "America/Sao_Paulo"],
+            ["Каракас", "Венесуэла", "America/Caracas"],
+            ["Кито", "Эквадор", "America/Guayaquil"],
+            ["Ла-Пас", "Боливия", "America/La_Paz"],
+            ["Монтевидео", "Уругвай", "America/Montevideo"],
+            ["Асунсьон", "Парагвай", "America/Asuncion"],
+            ["Каир", "Египет", "Africa/Cairo"],
+            ["Лагос", "Нигерия", "Africa/Lagos"],
+            ["Киншаса", "ДР Конго", "Africa/Kinshasa"],
+            ["Йоханнесбург", "ЮАР", "Africa/Johannesburg"],
+            ["Кейптаун", "ЮАР", "Africa/Johannesburg"],
+            ["Найроби", "Кения", "Africa/Nairobi"],
+            ["Аддис-Абеба", "Эфиопия", "Africa/Addis_Ababa"],
+            ["Касабланка", "Марокко", "Africa/Casablanca"],
+            ["Алжир", "Алжир", "Africa/Algiers"],
+            ["Тунис", "Тунис", "Africa/Tunis"],
+            ["Дакар", "Сенегал", "Africa/Dakar"],
+            ["Аккра", "Гана", "Africa/Accra"],
+            ["Эр-Рияд", "Саудовская Аравия", "Asia/Riyadh"],
+            ["Дубай", "ОАЭ", "Asia/Dubai"],
+            ["Абу-Даби", "ОАЭ", "Asia/Dubai"],
+            ["Доха", "Катар", "Asia/Qatar"],
+            ["Эль-Кувейт", "Кувейт", "Asia/Kuwait"],
+            ["Манама", "Бахрейн", "Asia/Bahrain"],
+            ["Маскат", "Оман", "Asia/Muscat"],
+            ["Тегеран", "Иран", "Asia/Tehran"],
+            ["Багдад", "Ирак", "Asia/Baghdad"],
+            ["Иерусалим", "Израиль", "Asia/Jerusalem"],
+            ["Тель-Авив", "Израиль", "Asia/Jerusalem"],
+            ["Бейрут", "Ливан", "Asia/Beirut"],
+            ["Дамаск", "Сирия", "Asia/Damascus"],
+            ["Амман", "Иордания", "Asia/Amman"],
+            ["Карачи", "Пакистан", "Asia/Karachi"],
+            ["Лахор", "Пакистан", "Asia/Karachi"],
+            ["Исламабад", "Пакистан", "Asia/Karachi"],
+            ["Дели", "Индия", "Asia/Kolkata"],
+            ["Мумбаи", "Индия", "Asia/Kolkata"],
+            ["Бангалор", "Индия", "Asia/Kolkata"],
+            ["Ченнаи", "Индия", "Asia/Kolkata"],
+            ["Калькутта", "Индия", "Asia/Kolkata"],
+            ["Хайдарабад", "Индия", "Asia/Kolkata"],
+            ["Дакка", "Бангладеш", "Asia/Dhaka"],
+            ["Коломбо", "Шри-Ланка", "Asia/Colombo"],
+            ["Катманду", "Непал", "Asia/Kathmandu"],
+            ["Тхимпху", "Бутан", "Asia/Thimphu"],
+            ["Янгон", "Мьянма", "Asia/Yangon"],
+            ["Бангкок", "Таиланд", "Asia/Bangkok"],
+            ["Ханой", "Вьетнам", "Asia/Ho_Chi_Minh"],
+            ["Хошимин", "Вьетнам", "Asia/Ho_Chi_Minh"],
+            ["Пномпень", "Камбоджа", "Asia/Phnom_Penh"],
+            ["Вьентьян", "Лаос", "Asia/Vientiane"],
+            ["Куала-Лумпур", "Малайзия", "Asia/Kuala_Lumpur"],
+            ["Сингапур", "Сингапур", "Asia/Singapore"],
+            ["Джакарта", "Индонезия", "Asia/Jakarta"],
+            ["Бали", "Индонезия", "Asia/Makassar"],
+            ["Манила", "Филиппины", "Asia/Manila"],
+            ["Гонконг", "Китай", "Asia/Hong_Kong"],
+            ["Пекин", "Китай", "Asia/Shanghai"],
+            ["Шанхай", "Китай", "Asia/Shanghai"],
+            ["Гуанчжоу", "Китай", "Asia/Shanghai"],
+            ["Шэньчжэнь", "Китай", "Asia/Shanghai"],
+            ["Чэнду", "Китай", "Asia/Shanghai"],
+            ["Тайбэй", "Тайвань", "Asia/Taipei"],
+            ["Сеул", "Южная Корея", "Asia/Seoul"],
+            ["Пусан", "Южная Корея", "Asia/Seoul"],
+            ["Токио", "Япония", "Asia/Tokyo"],
+            ["Осака", "Япония", "Asia/Tokyo"],
+            ["Нагоя", "Япония", "Asia/Tokyo"],
+            ["Улан-Батор", "Монголия", "Asia/Ulaanbaatar"],
+            ["Сидней", "Австралия", "Australia/Sydney"],
+            ["Мельбурн", "Австралия", "Australia/Melbourne"],
+            ["Брисбен", "Австралия", "Australia/Brisbane"],
+            ["Перт", "Австралия", "Australia/Perth"],
+            ["Аделаида", "Австралия", "Australia/Adelaide"],
+            ["Окленд", "Новая Зеландия", "Pacific/Auckland"],
+            ["Веллингтон", "Новая Зеландия", "Pacific/Auckland"],
+            ["Гонолулу", "США (Гавайи)", "Pacific/Honolulu"],
+            ["Анкоридж", "США (Аляска)", "America/Anchorage"],
+            ["Фиджи", "Фиджи", "Pacific/Fiji"],
+            ["Порт-Морсби", "Папуа — Новая Гвинея", "Pacific/Port_Moresby"],
+            ["Рейкьявик", "Исландия", "Atlantic/Reykjavik"],
+            ["Дублин", "Ирландия", "Europe/Dublin"],
+            ["Люксембург", "Люксембург", "Europe/Luxembourg"],
+            ["Монако", "Монако", "Europe/Monaco"],
+            ["Валлетта", "Мальта", "Europe/Malta"],
+            ["Никосия", "Кипр", "Asia/Nicosia"],
+            ["Загреб", "Хорватия", "Europe/Zagreb"],
+            ["Белград", "Сербия", "Europe/Belgrade"],
+            ["София", "Болгария", "Europe/Sofia"],
+            ["Бухарест", "Румыния", "Europe/Bucharest"],
+            ["Кишинёв", "Молдова", "Europe/Chisinau"],
+            ["Сараево", "Босния и Герцеговина", "Europe/Sarajevo"],
+            ["Скопье", "Северная Македония", "Europe/Skopje"],
+            ["Тирана", "Албания", "Europe/Tirane"],
+            ["Подгорица", "Черногория", "Europe/Podgorica"],
+            ["Любляна", "Словения", "Europe/Ljubljana"],
+            ["Братислава", "Словакия", "Europe/Bratislava"],
+            ["Вильнюс", "Литва", "Europe/Vilnius"],
+            ["Рига", "Латвия", "Europe/Riga"],
+            ["Таллин", "Эстония", "Europe/Tallinn"],
+            ["Хартум", "Судан", "Africa/Khartoum"],
+            ["Триполи", "Ливия", "Africa/Tripoli"],
+            ["Рабат", "Марокко", "Africa/Casablanca"],
+            ["Абуджа", "Нигерия", "Africa/Lagos"],
+            ["Луанда", "Ангола", "Africa/Luanda"],
+            ["Дар-эс-Салам", "Танзания", "Africa/Dar_es_Salaam"],
+            ["Кампала", "Уганда", "Africa/Kampala"],
+            ["Кигали", "Руанда", "Africa/Kigali"],
+            ["Хараре", "Зимбабве", "Africa/Harare"],
+            ["Лусака", "Замбия", "Africa/Lusaka"],
+            ["Габороне", "Ботсвана", "Africa/Gaborone"],
+            ["Виндхук", "Намибия", "Africa/Windhoek"],
+            ["Мапуту", "Мозамбик", "Africa/Maputo"],
+            ["Антананариву", "Мадагаскар", "Indian/Antananarivo"],
+            ["Порт-Луи", "Маврикий", "Indian/Mauritius"],
+            ["Виктория", "Сейшелы", "Indian/Mahe"],
+            ["Мале", "Мальдивы", "Indian/Maldives"],
+            ["Кабул", "Афганистан", "Asia/Kabul"],
+            ["Ашхабад", "Туркменистан", "Asia/Ashgabat"],
+        ];
+
+        const uniqueCities = [];
+        const seen = new Set();
+        for (const c of CITIES) {
+            const key = c[0] + '|' + c[1] + '|' + c[2];
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniqueCities.push(c);
+            }
+        }
+        uniqueCities.sort((a, b) => a[0].localeCompare(b[0], 'ru'));
+
+        // ===== Элементы =====
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalSubtitle = document.getElementById('modalSubtitle');
+        const modalInput = document.getElementById('modalInput');
+        const modalSuggestions = document.getElementById('modalSuggestions');
+        const modalError = document.getElementById('modalError');
+        const modalConfirm = document.getElementById('modalConfirm');
+
+        const grid = document.getElementById('grid');
+        const searchInput = document.getElementById('search');
+        const noResults = document.getElementById('noResults');
+        const statsEl = document.getElementById('stats');
+
+        const myCityName = document.getElementById('myCityName');
+        const myCityCountry = document.getElementById('myCityCountry');
+        const myCityHHMM = document.getElementById('myCityHHMM');
+        const myCitySS = document.getElementById('myCitySS');
+        const myCityDate = document.getElementById('myCityDate');
+        const myCityTz = document.getElementById('myCityTz');
+        const changeCityBtn = document.getElementById('changeCityBtn');
+        const addCityBtn = document.getElementById('addCityBtn');
+        const extraCitiesEl = document.getElementById('extraCities');
+
+        // ===== Состояние =====
+        const STORAGE_HOME = 'worldclock_home_city';
+        const STORAGE_EXTRA = 'worldclock_extra_cities';
+
+        let homeCity = null;
+        let extraCities = [];          // [{name, country, tz}, ...]
+        let selectedCity = null;       // выбранный в модалке
+        let modalMode = 'home';        // 'home' | 'add'
+        let timeElements = [];         // карточки на вкладке "Все города"
+        let extraElements = [];        // элементы дополнительных городов
+
+        // ===== Вкладки =====
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // ===== Модальное окно =====
+        function openModal(mode) {
+            modalMode = mode || 'home';
+            if (modalMode === 'home') {
+                modalTitle.textContent = 'В каком городе вы живёте?';
+                modalSubtitle.textContent = 'Выберите город — его время будет на первой вкладке.';
+            } else {
+                modalTitle.textContent = 'Добавить город';
+                modalSubtitle.textContent = 'Выберите город — его время добавится под вашим.';
+            }
+            modalOverlay.classList.remove('hidden');
+            modalInput.value = '';
+            modalSuggestions.innerHTML = '';
+            modalError.textContent = '';
+            selectedCity = null;
+            modalConfirm.disabled = true;
+            renderSuggestions('');
+            setTimeout(() => modalInput.focus(), 50);
+        }
+
+        function closeModal() {
+            modalOverlay.classList.add('hidden');
+        }
+
+        function renderSuggestions(query) {
+            const q = query.toLowerCase().trim();
+            modalSuggestions.innerHTML = '';
+            const list = q
+                ? uniqueCities.filter(c => (c[0] + ' ' + c[1]).toLowerCase().includes(q))
+                : uniqueCities;
+
+            const shown = list.slice(0, 30);
+            if (shown.length === 0) {
+                modalError.textContent = 'Город не найден';
+                return;
+            }
+
+            for (const [name, country, tz] of shown) {
+                const div = document.createElement('div');
+                div.className = 'suggestion';
+                div.innerHTML = `<span>${name}</span><span class="s-country">${country}</span>`;
+                div.addEventListener('click', () => {
+                    selectedCity = { name, country, tz };
+                    modalSuggestions.querySelectorAll('.suggestion').forEach(s => s.classList.remove('active'));
+                    div.classList.add('active');
+                    modalConfirm.disabled = false;
+                    modalError.textContent = '';
+                    modalInput.value = name;
+                });
+                modalSuggestions.appendChild(div);
+            }
+        }
+
+        let modalTimeout;
+        modalInput.addEventListener('input', () => {
+            clearTimeout(modalTimeout);
+            modalTimeout = setTimeout(() => {
+                selectedCity = null;
+                modalConfirm.disabled = true;
+                modalError.textContent = '';
+                renderSuggestions(modalInput.value);
+            }, 120);
+        });
+
+        modalInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (selectedCity) {
+                    confirmCity();
+                } else {
+                    const first = modalSuggestions.querySelector('.suggestion');
+                    if (first) first.click();
+                }
+            }
+        });
+
+        modalConfirm.addEventListener('click', confirmCity);
+
+        function confirmCity() {
+            if (!selectedCity) return;
+
+            if (modalMode === 'home') {
+                homeCity = selectedCity;
+                localStorage.setItem(STORAGE_HOME, JSON.stringify(homeCity));
+                renderMyCity();
+                switchToMyTab();
+            } else {
+                // не добавляем дубликат и не добавляем сам "мой город"
+                const isHome = homeCity &&
+                    homeCity.name === selectedCity.name &&
+                    homeCity.tz === selectedCity.tz;
+                const isDup = extraCities.some(c =>
+                    c.name === selectedCity.name && c.tz === selectedCity.tz);
+
+                if (!isHome && !isDup) {
+                    extraCities.push(selectedCity);
+                    saveExtraCities();
+                    renderExtraCities();
+                    updateExtraTimes();
+                }
+            }
+            closeModal();
+        }
+
+        function saveExtraCities() {
+            localStorage.setItem(STORAGE_EXTRA, JSON.stringify(extraCities));
+        }
+
+        function switchToMyTab() {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector('.tab[data-tab="my"]').classList.add('active');
+            document.getElementById('tab-my').classList.add('active');
+        }
+
+        changeCityBtn.addEventListener('click', () => openModal('home'));
+        addCityBtn.addEventListener('click', () => openModal('add'));
+
+        // ===== Отображение "Мой город" =====
+        function renderMyCity() {
+            if (!homeCity) {
+                myCityName.textContent = 'Город не выбран';
+                myCityCountry.textContent = '';
+                myCityHHMM.textContent = '--:--';
+                myCitySS.textContent = ':--';
+                myCityDate.textContent = '—';
+                myCityTz.textContent = '—';
+                return;
+            }
+            myCityName.textContent = homeCity.name;
+            myCityCountry.textContent = homeCity.country;
+            myCityTz.textContent = homeCity.tz;
+        }
+
+        function updateMyCityTime() {
+            if (!homeCity) return;
+            const now = new Date();
+            try {
+                const timeStr = now.toLocaleTimeString('ru-RU', {
+                    timeZone: homeCity.tz,
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                });
+                const parts = timeStr.split(':');
+                myCityHHMM.textContent = parts[0] + ':' + parts[1];
+                myCitySS.textContent = ':' + parts[2];
+
+                myCityDate.textContent = now.toLocaleDateString('ru-RU', {
+                    timeZone: homeCity.tz,
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                });
+            } catch (e) {
+                myCityHHMM.textContent = '--:--';
+                myCitySS.textContent = ':--';
+            }
+        }
+
+        // ===== Дополнительные города =====
+        function renderExtraCities() {
+            extraCitiesEl.innerHTML = '';
+            extraElements = [];
+
+            for (let i = 0; i < extraCities.length; i++) {
+                const city = extraCities[i];
+
+                const row = document.createElement('div');
+                row.className = 'extra-city';
+
+                const info = document.createElement('div');
+                info.className = 'extra-info';
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'extra-name';
+                nameEl.textContent = city.name;
+
+                const dateEl = document.createElement('div');
+                dateEl.className = 'extra-date';
+                dateEl.textContent = '---';
+
+                info.appendChild(nameEl);
+                info.appendChild(dateEl);
+
+                const timeWrap = document.createElement('div');
+                timeWrap.className = 'extra-time-wrap';
+
+                const timeEl = document.createElement('div');
+                timeEl.className = 'extra-time';
+                timeEl.textContent = '--:--:--';
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-extra';
+                removeBtn.textContent = '×';
+                removeBtn.title = 'Удалить';
+                removeBtn.addEventListener('click', () => {
+                    extraCities.splice(i, 1);
+                    saveExtraCities();
+                    renderExtraCities();
+                    updateExtraTimes();
+                });
+
+                timeWrap.appendChild(timeEl);
+                timeWrap.appendChild(removeBtn);
+
+                row.appendChild(info);
+                row.appendChild(timeWrap);
+                extraCitiesEl.appendChild(row);
+
+                extraElements.push({ timeEl, dateEl, tz: city.tz });
+            }
+        }
+
+        function updateExtraTimes() {
+            const now = new Date();
+            for (const { timeEl, dateEl, tz } of extraElements) {
+                try {
+                    timeEl.textContent = now.toLocaleTimeString('ru-RU', {
+                        timeZone: tz,
+                        hour12: false,
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                    });
+                    dateEl.textContent = now.toLocaleDateString('ru-RU', {
+                        timeZone: tz,
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                    });
+                } catch (e) {
+                    timeEl.textContent = 'Ошибка';
+                    dateEl.textContent = '';
+                }
+            }
+        }
+
+        // ===== Вкладка "Все города" =====
+        function buildGrid(filter) {
+            grid.innerHTML = '';
+            timeElements = [];
+            const f = filter.toLowerCase().trim();
+            let visibleCount = 0;
+
+            for (const [name, country, tz] of uniqueCities) {
+                const text = (name + ' ' + country + ' ' + tz).toLowerCase();
+                if (f && !text.includes(f)) continue;
+
+                visibleCount++;
+
+                const card = document.createElement('div');
+                card.className = 'city-card';
+
+                const info = document.createElement('div');
+                info.className = 'city-info';
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'city-name';
+                nameEl.textContent = name;
+
+                const countryEl = document.createElement('div');
+                countryEl.className = 'city-country';
+                countryEl.textContent = country;
+
+                info.appendChild(nameEl);
+                info.appendChild(countryEl);
+
+                const timeWrapper = document.createElement('div');
+                timeWrapper.style.textAlign = 'right';
+
+                const timeEl = document.createElement('div');
+                timeEl.className = 'city-time';
+                timeEl.textContent = '--:--:--';
+
+                const dateEl = document.createElement('div');
+                dateEl.className = 'city-date';
+                dateEl.textContent = '---';
+
+                timeWrapper.appendChild(timeEl);
+                timeWrapper.appendChild(dateEl);
+
+                card.appendChild(info);
+                card.appendChild(timeWrapper);
+                grid.appendChild(card);
+
+                timeElements.push({ timeEl, dateEl, tz });
+            }
+
+            noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+            statsEl.textContent = `Показано: ${visibleCount} из ${uniqueCities.length} городов`;
+        }
+
+        function updateAllCitiesTimes() {
+            const now = new Date();
+            for (const { timeEl, dateEl, tz } of timeElements) {
+                try {
+                    timeEl.textContent = now.toLocaleTimeString('ru-RU', {
+                        timeZone: tz,
+                        hour12: false,
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                    });
+                    dateEl.textContent = now.toLocaleDateString('ru-RU', {
+                        timeZone: tz,
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                    });
+                } catch (e) {
+                    timeEl.textContent = 'Ошибка';
+                    dateEl.textContent = 'часового пояса';
+                }
+            }
+        }
+
+        let searchTimeout;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                buildGrid(searchInput.value);
+                updateAllCitiesTimes();
+            }, 200);
+        });
+
+        // ===== Общий тик =====
+        function tick() {
+            updateMyCityTime();
+            updateExtraTimes();
+            updateAllCitiesTimes();
+        }
+
+        // ===== Инициализация =====
+        function init() {
+            const savedHome = localStorage.getItem(STORAGE_HOME);
+            if (savedHome) {
+                try { homeCity = JSON.parse(savedHome); } catch (e) { homeCity = null; }
+            }
+
+            const savedExtra = localStorage.getItem(STORAGE_EXTRA);
+            if (savedExtra) {
+                try {
+                    extraCities = JSON.parse(savedExtra);
+                    if (!Array.isArray(extraCities)) extraCities = [];
+                } catch (e) { extraCities = []; }
+            }
+
+            buildGrid('');
+            renderMyCity();
+            renderExtraCities();
+            tick();
+
+            if (!homeCity) {
+                openModal('home');
+            }
+
+            setInterval(tick, 1000);
+        }
+
+        init();
+    </script>
+</body>
 </html>
