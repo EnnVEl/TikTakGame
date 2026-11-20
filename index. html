@@ -43,7 +43,7 @@
             color: #94a3b8;
         }
 
-        /* ---------- Модальное окно выбора города ---------- */
+        /* ---------- Модальное окно ---------- */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -252,6 +252,114 @@
             font-family: monospace;
         }
 
+        /* Кнопка "+" под временем */
+        .add-city-wrap {
+            margin-top: 1.5rem;
+        }
+
+        .add-city-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: #60a5fa;
+            font-size: 1.5rem;
+            line-height: 1;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, transform 0.1s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .add-city-btn:hover {
+            border-color: #3b82f6;
+            background: #1e293b;
+            transform: scale(1.05);
+        }
+
+        /* Дополнительные города */
+        .extra-cities {
+            margin-top: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .extra-city {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 0.65rem 0.85rem;
+            text-align: left;
+            transition: border-color 0.15s;
+        }
+
+        .extra-city:hover {
+            border-color: #475569;
+        }
+
+        .extra-info {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .extra-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #e2e8f0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .extra-date {
+            font-size: 0.65rem;
+            color: #64748b;
+            margin-top: 1px;
+        }
+
+        .extra-time-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+            margin-left: 0.5rem;
+        }
+
+        .extra-time {
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #a78bfa;
+            letter-spacing: 0.5px;
+        }
+
+        .remove-extra {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: #64748b;
+            font-size: 1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s, background 0.15s;
+            flex-shrink: 0;
+        }
+
+        .remove-extra:hover {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.1);
+        }
+
         .change-city-btn {
             margin-top: 1.75rem;
             padding: 0.6rem 1.4rem;
@@ -380,11 +488,11 @@
 </head>
 <body>
 
-    <!-- Модальное окно выбора города проживания -->
+    <!-- Модальное окно выбора города -->
     <div class="modal-overlay hidden" id="modalOverlay">
         <div class="modal">
-            <h2>В каком городе вы живёте?</h2>
-            <p>Выберите город — его время будет на первой вкладке.</p>
+            <h2 id="modalTitle">В каком городе вы живёте?</h2>
+            <p id="modalSubtitle">Выберите город — его время будет на первой вкладке.</p>
             <input type="text" id="modalInput" placeholder="Начните вводить название..." autocomplete="off">
             <div class="modal-suggestions" id="modalSuggestions"></div>
             <div class="modal-error" id="modalError"></div>
@@ -413,7 +521,16 @@
                 </div>
                 <div class="my-city-date" id="myCityDate">—</div>
                 <div class="my-city-tz" id="myCityTz">—</div>
-                <button class="change-city-btn" id="changeCityBtn">Сменить город</button>
+
+                <!-- Кнопка "+" -->
+                <div class="add-city-wrap">
+                    <button class="add-city-btn" id="addCityBtn" title="Добавить город">+</button>
+                </div>
+
+                <!-- Дополнительные города -->
+                <div class="extra-cities" id="extraCities"></div>
+
+                <button class="change-city-btn" id="changeCityBtn">Сменить мой город</button>
             </div>
         </div>
 
@@ -427,7 +544,7 @@
     </div>
 
     <script>
-        // ===== Список городов: [Название, Страна, IANA часовой пояс] =====
+        // ===== Список городов =====
         const CITIES = [
             ["Орёл", "Россия", "Europe/Moscow"],
             ["Москва", "Россия", "Europe/Moscow"],
@@ -633,7 +750,6 @@
             ["Ашхабад", "Туркменистан", "Asia/Ashgabat"],
         ];
 
-        // Убираем дубликаты
         const uniqueCities = [];
         const seen = new Set();
         for (const c of CITIES) {
@@ -647,6 +763,8 @@
 
         // ===== Элементы =====
         const modalOverlay = document.getElementById('modalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalSubtitle = document.getElementById('modalSubtitle');
         const modalInput = document.getElementById('modalInput');
         const modalSuggestions = document.getElementById('modalSuggestions');
         const modalError = document.getElementById('modalError');
@@ -664,12 +782,19 @@
         const myCityDate = document.getElementById('myCityDate');
         const myCityTz = document.getElementById('myCityTz');
         const changeCityBtn = document.getElementById('changeCityBtn');
+        const addCityBtn = document.getElementById('addCityBtn');
+        const extraCitiesEl = document.getElementById('extraCities');
 
         // ===== Состояние =====
-        const STORAGE_KEY = 'worldclock_home_city';
-        let homeCity = null;          // { name, country, tz }
-        let selectedCity = null;      // выбранный в модалке
-        let timeElements = [];        // карточки на вкладке "Все города"
+        const STORAGE_HOME = 'worldclock_home_city';
+        const STORAGE_EXTRA = 'worldclock_extra_cities';
+
+        let homeCity = null;
+        let extraCities = [];          // [{name, country, tz}, ...]
+        let selectedCity = null;       // выбранный в модалке
+        let modalMode = 'home';        // 'home' | 'add'
+        let timeElements = [];         // карточки на вкладке "Все города"
+        let extraElements = [];        // элементы дополнительных городов
 
         // ===== Вкладки =====
         document.querySelectorAll('.tab').forEach(tab => {
@@ -682,7 +807,15 @@
         });
 
         // ===== Модальное окно =====
-        function openModal() {
+        function openModal(mode) {
+            modalMode = mode || 'home';
+            if (modalMode === 'home') {
+                modalTitle.textContent = 'В каком городе вы живёте?';
+                modalSubtitle.textContent = 'Выберите город — его время будет на первой вкладке.';
+            } else {
+                modalTitle.textContent = 'Добавить город';
+                modalSubtitle.textContent = 'Выберите город — его время добавится под вашим.';
+            }
             modalOverlay.classList.remove('hidden');
             modalInput.value = '';
             modalSuggestions.innerHTML = '';
@@ -704,7 +837,6 @@
                 ? uniqueCities.filter(c => (c[0] + ' ' + c[1]).toLowerCase().includes(q))
                 : uniqueCities;
 
-            // ограничим до 30 подсказок для скорости
             const shown = list.slice(0, 30);
             if (shown.length === 0) {
                 modalError.textContent = 'Город не найден';
@@ -721,7 +853,6 @@
                     div.classList.add('active');
                     modalConfirm.disabled = false;
                     modalError.textContent = '';
-                    // подставляем название в поле
                     modalInput.value = name;
                 });
                 modalSuggestions.appendChild(div);
@@ -739,7 +870,6 @@
             }, 120);
         });
 
-        // Enter — выбрать первый подходящий или подтвердить
         modalInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 if (selectedCity) {
@@ -755,11 +885,32 @@
 
         function confirmCity() {
             if (!selectedCity) return;
-            homeCity = selectedCity;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(homeCity));
+
+            if (modalMode === 'home') {
+                homeCity = selectedCity;
+                localStorage.setItem(STORAGE_HOME, JSON.stringify(homeCity));
+                renderMyCity();
+                switchToMyTab();
+            } else {
+                // не добавляем дубликат и не добавляем сам "мой город"
+                const isHome = homeCity &&
+                    homeCity.name === selectedCity.name &&
+                    homeCity.tz === selectedCity.tz;
+                const isDup = extraCities.some(c =>
+                    c.name === selectedCity.name && c.tz === selectedCity.tz);
+
+                if (!isHome && !isDup) {
+                    extraCities.push(selectedCity);
+                    saveExtraCities();
+                    renderExtraCities();
+                    updateExtraTimes();
+                }
+            }
             closeModal();
-            renderMyCity();
-            switchToMyTab();
+        }
+
+        function saveExtraCities() {
+            localStorage.setItem(STORAGE_EXTRA, JSON.stringify(extraCities));
         }
 
         function switchToMyTab() {
@@ -769,7 +920,8 @@
             document.getElementById('tab-my').classList.add('active');
         }
 
-        changeCityBtn.addEventListener('click', openModal);
+        changeCityBtn.addEventListener('click', () => openModal('home'));
+        addCityBtn.addEventListener('click', () => openModal('add'));
 
         // ===== Отображение "Мой город" =====
         function renderMyCity() {
@@ -812,6 +964,84 @@
             } catch (e) {
                 myCityHHMM.textContent = '--:--';
                 myCitySS.textContent = ':--';
+            }
+        }
+
+        // ===== Дополнительные города =====
+        function renderExtraCities() {
+            extraCitiesEl.innerHTML = '';
+            extraElements = [];
+
+            for (let i = 0; i < extraCities.length; i++) {
+                const city = extraCities[i];
+
+                const row = document.createElement('div');
+                row.className = 'extra-city';
+
+                const info = document.createElement('div');
+                info.className = 'extra-info';
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'extra-name';
+                nameEl.textContent = city.name;
+
+                const dateEl = document.createElement('div');
+                dateEl.className = 'extra-date';
+                dateEl.textContent = '---';
+
+                info.appendChild(nameEl);
+                info.appendChild(dateEl);
+
+                const timeWrap = document.createElement('div');
+                timeWrap.className = 'extra-time-wrap';
+
+                const timeEl = document.createElement('div');
+                timeEl.className = 'extra-time';
+                timeEl.textContent = '--:--:--';
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-extra';
+                removeBtn.textContent = '×';
+                removeBtn.title = 'Удалить';
+                removeBtn.addEventListener('click', () => {
+                    extraCities.splice(i, 1);
+                    saveExtraCities();
+                    renderExtraCities();
+                    updateExtraTimes();
+                });
+
+                timeWrap.appendChild(timeEl);
+                timeWrap.appendChild(removeBtn);
+
+                row.appendChild(info);
+                row.appendChild(timeWrap);
+                extraCitiesEl.appendChild(row);
+
+                extraElements.push({ timeEl, dateEl, tz: city.tz });
+            }
+        }
+
+        function updateExtraTimes() {
+            const now = new Date();
+            for (const { timeEl, dateEl, tz } of extraElements) {
+                try {
+                    timeEl.textContent = now.toLocaleTimeString('ru-RU', {
+                        timeZone: tz,
+                        hour12: false,
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                    });
+                    dateEl.textContent = now.toLocaleDateString('ru-RU', {
+                        timeZone: tz,
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                    });
+                } catch (e) {
+                    timeEl.textContent = 'Ошибка';
+                    dateEl.textContent = '';
+                }
             }
         }
 
@@ -906,27 +1136,32 @@
         // ===== Общий тик =====
         function tick() {
             updateMyCityTime();
+            updateExtraTimes();
             updateAllCitiesTimes();
         }
 
         // ===== Инициализация =====
         function init() {
-            // загрузка города из localStorage
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
+            const savedHome = localStorage.getItem(STORAGE_HOME);
+            if (savedHome) {
+                try { homeCity = JSON.parse(savedHome); } catch (e) { homeCity = null; }
+            }
+
+            const savedExtra = localStorage.getItem(STORAGE_EXTRA);
+            if (savedExtra) {
                 try {
-                    homeCity = JSON.parse(saved);
-                } catch (e) {
-                    homeCity = null;
-                }
+                    extraCities = JSON.parse(savedExtra);
+                    if (!Array.isArray(extraCities)) extraCities = [];
+                } catch (e) { extraCities = []; }
             }
 
             buildGrid('');
             renderMyCity();
+            renderExtraCities();
             tick();
 
             if (!homeCity) {
-                openModal();
+                openModal('home');
             }
 
             setInterval(tick, 1000);
